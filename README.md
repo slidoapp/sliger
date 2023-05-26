@@ -1,8 +1,8 @@
 # `sliger`
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/slidoapp/sliger/main/static/images/sliger-black.png" />
-  <strong>Slide of the tiger</strong>
+  <img src="https://raw.githubusercontent.com/slidoapp/sliger/main/static/images/sliger-black.png" /> <br />
+  <strong>Slide of the tiger</strong> <br />
   <em>Slide the power of Python (and Jinja2) into Google Slides</em>
 </p>
 
