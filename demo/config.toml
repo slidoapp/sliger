@@ -1,0 +1,4 @@
+[function_map]
+events_count = "custom_functions.events_count"
+greet_pycon = "custom_functions.greet_pycon"
+revenue_chart = "custom_functions.revenue_chart"
