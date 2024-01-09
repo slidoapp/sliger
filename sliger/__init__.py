@@ -16,7 +16,7 @@ from googleapiclient.http import MediaFileUpload
 from jinja2 import BaseLoader, Environment
 
 app = typer.Typer()
-state = {}
+state = {"verbose": False}
 
 
 # StringLoader is a custom Jinja2 template loader for rendering templates
@@ -73,10 +73,11 @@ def duplicate_presentation(copy_title: str = typer.Option(...)):
         def callback(request_id, response, exception):
             if exception:
                 # Handle error
-                print(exception)
+                print(exception, file=sys.stderr)
             else:
-                print(f"Request_Id: {request_id}")
-                print(f'Permission Id: {response.get("id")}')
+                if state["verbose"]:
+                    print(f"Request_Id: {request_id}")
+                    print(f'Permission Id: {response.get("id")}')
                 ids.append(response.get("id"))
 
         # pylint: disable=maybe-no-member
@@ -94,13 +95,17 @@ def duplicate_presentation(copy_title: str = typer.Option(...)):
         )
         batch.execute()
 
-        print(
-            f"Created new presentation at https://docs.google.com/presentation/d/{presentation_copy_id}/edit"
-        )
+        if state["verbose"]:
+            print(
+                f"Created new presentation at https://docs.google.com/presentation/d/{presentation_copy_id}/edit"
+            )
+        else:
+            print(presentation_copy_id)
+
         return presentation_copy_id
 
     except HttpError as err:
-        print(err)
+        print(err, file=sys.stderr)
 
     return None
 
@@ -130,27 +135,34 @@ def delete_slide(id: int = typer.Option(...)):
         )
         slides = presentation.get("slides")
 
-        print("The presentation contains {} slides:".format(len(slides)))
+        if state["verbose"]:
+            print("The presentation contains {} slides:".format(len(slides)))
+
         slide_to_delete_id = None
         for i, slide in enumerate(slides):
             slide_id = slide.get("objectId")
             if slide_to_delete == i + 1:
                 slide_to_delete_id = slide_id
-            print(
-                "- Slide #{} ({}) contains {} elements.".format(
-                    i + 1, slide_id, len(slide.get("pageElements"))
+
+            if state["verbose"]:
+                print(
+                    "- Slide #{} ({}) contains {} elements.".format(
+                        i + 1, slide_id, len(slide.get("pageElements"))
+                    )
                 )
-            )
 
         slide_ids = [slide_id for slide_id in slides]
         if slide_to_delete_id is None and slide_to_delete_id not in slide_ids:
             print(
                 f"\nSlide number {id} doesn't exist (id: {slide_id})."
-                f"Please input an existing slide from your presentation."
+                f"Please input an existing slide from your presentation.",
+                file=sys.stderr,
             )
         else:
             res = delete_slide_by_id(service, presentation_id, slide_to_delete_id)
-            pprint(res)
+
+            if state["verbose"]:
+                pprint(res)
 
     except HttpError as err:
         print(err)
@@ -181,34 +193,43 @@ def duplicate_slide(id: int = typer.Option(...)):
         )
         slides = presentation.get("slides")
 
-        print("The presentation contains {} slides:".format(len(slides)))
+        if state["verbose"]:
+            print("The presentation contains {} slides:".format(len(slides)))
+
         slide_to_duplicate_id = None
         for i, slide in enumerate(slides):
             slide_id = slide.get("objectId")
             if slide_to_duplicate == i + 1:
                 slide_to_duplicate_id = slide_id
-            print(
-                "- Slide #{} ({}) contains {} elements.".format(
-                    i + 1, slide_id, len(slide.get("pageElements"))
+
+            if state["verbose"]:
+                print(
+                    "- Slide #{} ({}) contains {} elements.".format(
+                        i + 1, slide_id, len(slide.get("pageElements"))
+                    )
                 )
-            )
 
         slide_ids = [slide_id for slide_id in slides]
         if slide_to_duplicate_id is None and slide_to_duplicate_id not in slide_ids:
-            print(
-                f"\nSlide number {id} doesn't exist (id: {slide_id})."
-                f"Please input an existing slide from your presentation."
-            )
+            if state["verbose"]:
+                print(
+                    f"\nSlide number {id} doesn't exist (id: {slide_id})."
+                    f"Please input an existing slide from your presentation.",
+                    file=sys.stderr,
+                )
         else:
             res = duplicate_slide_by_id(service, presentation_id, slide_to_duplicate_id)
-            pprint(res)
+            if state["verbose"]:
+                pprint(res)
 
             # Call the Slides API again
             presentation = (
                 service.presentations().get(presentationId=presentation_id).execute()
             )
             slides = presentation.get("slides")
-            print("\n Now the presentation contains {} slides".format(len(slides)))
+
+            if state["verbose"]:
+                print("\n Now the presentation contains {} slides".format(len(slides)))
 
     except HttpError as err:
         print(err)
@@ -272,14 +293,18 @@ def jinjify(data: str = typer.Option("{}", callback=ast.literal_eval)):
         )
         slides = presentation.get("slides")
 
-        print("The presentation contains {} slides:".format(len(slides)))
+        if state["verbose"]:
+            print("The presentation contains {} slides:".format(len(slides)))
+
         for i, slide in enumerate(slides):
             slide_id = slide.get("objectId")
-            print(
-                "- Slide #{} ({}) contains {} elements.".format(
-                    i + 1, slide_id, len(slide.get("pageElements"))
+
+            if state["verbose"]:
+                print(
+                    "- Slide #{} ({}) contains {} elements.".format(
+                        i + 1, slide_id, len(slide.get("pageElements"))
+                    )
                 )
-            )
 
             elements = slide.get("pageElements")
             text_elements = filter(
@@ -308,7 +333,9 @@ def jinjify(data: str = typer.Option("{}", callback=ast.literal_eval)):
             ]
 
             if len(gslides_update_requests) != 0:
-                print("Executing changes", gslides_update_requests)
+                if state["verbose"]:
+                    print("Executing changes", gslides_update_requests)
+
                 body = {"requests": gslides_update_requests}
 
                 response = (
@@ -319,7 +346,7 @@ def jinjify(data: str = typer.Option("{}", callback=ast.literal_eval)):
                 print(response)
 
     except HttpError as err:
-        print(err)
+        print(err, file=sys.stderr)
 
 
 def upload_image(
@@ -409,12 +436,16 @@ def upload_image(
         )
 
         create_image_response = response.get("replies")[0].get("createImage")
-        print(
-            "Created image with ID: {0}".format(create_image_response.get("objectId"))
-        )
+
+        if state["verbose"]:
+            print(
+                "Created image with ID: {0}".format(
+                    create_image_response.get("objectId")
+                )
+            )
 
     except HttpError as error:
-        print(f"An error occurred: {error}")
+        print(f"An error occurred: {error}", file=sys.stderr)
 
 
 def delete_element(service, presentation_id: str, object_id: str):
@@ -437,14 +468,18 @@ def imagify():
         )
         slides = presentation.get("slides")
 
-        print("The presentation contains {} slides:".format(len(slides)))
+        if state["verbose"]:
+            print("The presentation contains {} slides:".format(len(slides)))
+
         for i, slide in enumerate(slides):
             slide_id = slide.get("objectId")
-            print(
-                "- Slide #{} ({}) contains {} elements.".format(
-                    i + 1, slide_id, len(slide.get("pageElements"))
+
+            if state["verbose"]:
+                print(
+                    "- Slide #{} ({}) contains {} elements.".format(
+                        i + 1, slide_id, len(slide.get("pageElements"))
+                    )
                 )
-            )
 
             elements = slide.get("pageElements")
             text_elements = filter(
@@ -474,7 +509,7 @@ def imagify():
                     delete_element(service, presentation_id, text_element["objectId"])
 
     except HttpError as err:
-        print(err)
+        print(err, file=sys.stderr)
 
 
 @app.callback()
@@ -482,10 +517,12 @@ def main(
     creds_file: Path = typer.Option(...),
     presentation_id: str = typer.Option(...),
     config_path: str = typer.Option(None),
+    verbose: bool = False,
 ):
     state["creds"] = service_account.Credentials.from_service_account_file(creds_file)
     state["presentation_id"] = presentation_id
     state["jinja_env"] = load_jinja_environment(config_path)
+    state["verbose"] = verbose
 
 
 if __name__ == "__main__":
